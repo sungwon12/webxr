@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "./threejs/build/three.module.js",
+                    "VRButton": "./threejs/examples/jsm/webxr/VRButton.js",
+                    "GLTFLoader": "./threejs/examples/jsm/loaders/GLTFLoader.js"
+                }
+            }
+        </script>
+        <style>
+            html, body {
+                margin: 0;
+                height: 100%;
+            }
+
+            #c {
+                width: 100%;
+                height: 100%;
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="c" data-engine="three.js r141"></canvas>
+        <script type="module">
+            import * as THREE from 'three';
+            import {VRButton} from 'VRButton';
+            import {GLTFLoader} from 'GLTFLoader';
+
+            function main() {
+                const canvas = document.querySelector('#c');
+                const renderer = new THREE.WebGLRenderer({canvas});
+                
+                renderer.xr.enabled = true;
+                document.body.appendChild(VRButton.createButton(renderer));
+
+                const fov = 75;
+                const aspect = 2;
+                const near = 0.1;
+                const far = 5;
+                const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+                camera.position.set(0, 1.6, 0);
+
+                const scene = new THREE.Scene();
+
+                const loader = new THREE.CubeTextureLoader();
+                const texture = loader.load([
+                    'threejs/grid-1024.png',
+                    'threejs/grid-1024.png',
+                    'threejs/grid-1024.png',
+                    'threejs/grid-1024.png',
+                    'threejs/grid-1024.png',
+                    'threejs/grid-1024.png'
+                ]);
+                scene.background = texture;
+            
+                const gltfLoader = new GLTFLoader();
+                const url = 'media/gltf/custom-cube/cube2.gltf';
+                gltfLoader.load(url, (gltf) => {
+                    const root = gltf.scene;
+                    console.log(root);
+                    scene.add(root);
+
+                    // const box = new THREE.Box3().setFromObject(root);
+
+                    // const boxSize = box.getSize(new THREE.Vector3()).length();
+                    // const boxCenter = box.getCenter(new THREE.Vector3());
+                });
+            
+
+            
+                const color = 0xFFFFFF;
+                const intensity = 1;
+                const light = new THREE.DirectionalLight(color, intensity);
+                light.position.set(-1, 2, 4);
+                scene.add(light);
+
+                const boxWidth = 1;
+                const boxHeight = 1;
+                const boxDepth = 1;
+                const geometry = new THREE.BoxGeometry(boxWidth, boxHeight, boxDepth);
+                
+                function makeInstance(geometry, color, x) {
+                    const material = new THREE.MeshPhongMaterial({color});
+                    const cube = new THREE.Mesh(geometry, material);
+                    scene.add(cube);
+
+                    cube.position.x = x;
+                    cube.position.y = 1.6;
+                    cube.position.z = -2;
+
+                    return cube;
+                }
+
+                const cubes = [
+                    makeInstance(geometry, 0x44aa88, 0),
+                    makeInstance(geometry, 0x8844aa, -2),
+                    makeInstance(geometry, 0xaa8844, 2),
+                ]
+
+                cubes.forEach((cube) => {
+                    console.log(cube);
+                });
+
+                class ControllerPickHelper extends THREE.EventDispatcher {
+                    constructor(scene) {
+                        super();
+                        this.raycaster = new THREE.Raycaster();
+                        this.objectToColorMap = new Map();
+                        this.controllerToObjectMap = new Map();
+                        this.tempMatrix = new THREE.Matrix4();
+
+                        const pointerGeometry = new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(0, 0, 0),
+                            new THREE.Vector3(0, 0, -1),
+                        ]);
+
+                        this.controllers = [];
+
+                        const selectListener = (event) => {
+                            const controller = event.target;
+                            const selectedObject = this.controllerToObjectMap.get(event.target);
+                            if (selectedObject) {
+                                this.dispatchEvent({ type: event.type, controller, selectedObject });
+                            }
+                        };
+
+                        const endListener = (event) => {
+                            const controller = event.target;
+                            this.dispatchEvent({ type: event.type, controller });
+                        };
+
+                        for (let i = 0; i < 2; ++i) {
+                            const controller = renderer.xr.getController(i);
+                            controller.addEventListener('select', selectListener);
+                            controller.addEventListener('selectstart', selectListener);
+                            controller.addEventListener('selectend', endListener);
+                            scene.add(controller);
+
+                            const line = new THREE.Line(pointerGeometry);
+                            line.scale.z = 5;
+                            controller.add(line);
+                            this.controllers.push({ controller, line });
+                        }
+                    }
+                    reset() {
+                        // restore the colors
+                        this.objectToColorMap.forEach((color, object) => {
+                            object.material.emissive.setHex(color);
+                        });
+                        this.objectToColorMap.clear();
+                        this.controllerToObjectMap.clear();
+                    }
+                    update(pickablesParent, time) {
+                        this.reset();
+                        for (const { controller, line } of this.controllers) {
+                            // cast a ray through the from the controller
+                            this.tempMatrix.identity().extractRotation(controller.matrixWorld);
+                            this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+                            this.raycaster.ray.direction.set(0, 0, -1).applyMatrix4(this.tempMatrix);
+                            // get the list of objects the ray intersected
+                            const intersections = this.raycaster.intersectObjects(pickablesParent.children);
+                            if (intersections.length) {
+                                const intersection = intersections[0];
+                                // make the line touch the object
+                                line.scale.z = intersection.distance;
+                                // pick the first object. It's the closest one
+                                const pickedObject = intersection.object;
+                                // save which object this controller picked
+                                // this.controllerToObjectMap.set(controller, pickedObject);
+                                // highlight the object if we haven't already
+                                // if (this.objectToColorMap.get(pickedObject) === undefined) {
+                                //     // save its color
+                                //     this.objectToColorMap.set(pickedObject, pickedObject.material.emissive.getHex());
+                                //     // set its emissive color to flashing red/yellow
+                                //     pickedObject.material.emissive.setHex((time * 8) % 2 > 1 ? 0xFF2000 : 0xFF0000);
+                                // }
+                                
+                                console.log(intersection);
+                            } else {
+                                line.scale.z = 5;
+                            }
+                        }
+                    }
+                }
+
+                const controllerToSelection = new Map();
+                const pickHelper = new ControllerPickHelper(scene);
+                pickHelper.addEventListener('selectstart', (event) => {
+                    const { controller, selectedObject } = event;
+                    const existingSelection = controllerToSelection.get(controller);
+                    if (!existingSelection) {
+                        controllerToSelection.set(controller, {
+                            object: selectedObject,
+                            parent: selectedObject.parent,
+                        });
+                        controller.attach(selectedObject);
+                    }
+                });
+
+                pickHelper.addEventListener('selectend', (event) => {
+                    const { controller } = event;
+                    const selection = controllerToSelection.get(controller);
+                    if (selection) {
+                        controllerToSelection.delete(controller);
+                        selection.parent.attach(selection.object);
+                    }
+                });
+            
+                function resizeRendererToDisplaySize(renderer) {
+                    const canvas = renderer.domElement;
+                    const width = canvas.clientWidth;
+                    const height = canvas.clientHeight;
+                    const needResize = canvas.width !== width || canvas.height !== height;
+                    if (needResize) {
+                        renderer.setSize(width, height, false);
+                    }
+                    return needResize;
+                }
+
+                function render(time) {
+                    time *= 0.001;
+
+                    if (resizeRendererToDisplaySize(renderer)) {
+                        const canvas = renderer.domElement;
+                        camera.aspect = canvas.clientWidth / canvas. clientHeight;
+                        camera.updateProjectionMatrix();
+                    }
+
+                    cubes.forEach((cube,ndx) => {
+                        const speed = 1 + ndx * 0.1;
+                        const rot = time * speed;
+                        cube.rotation.x = rot;
+                        cube.rotation.y = rot;
+                    });
+
+                    renderer.render(scene, camera);
+                }
+
+                renderer.setAnimationLoop(render);
+            }
+
+            main();
+        </script>
+    </body>
+</html>
