@@ -56,13 +56,15 @@
                     'threejs/grid-1024.png'
                 ]);
                 scene.background = texture;
+
+                const pickRoot = new THREE.Object3D();
+                scene.add(pickRoot);
             
                 const gltfLoader = new GLTFLoader();
                 const url = 'media/gltf/custom-cube/cube2.gltf';
                 gltfLoader.load(url, (gltf) => {
                     const root = gltf.scene;
-                    console.log(root);
-                    scene.add(root);
+                    pickRoot.add(root);
 
                     // const box = new THREE.Box3().setFromObject(root);
 
@@ -86,7 +88,7 @@
                 function makeInstance(geometry, color, x) {
                     const material = new THREE.MeshPhongMaterial({color});
                     const cube = new THREE.Mesh(geometry, material);
-                    scene.add(cube);
+                    pickRoot.add(cube);
 
                     cube.position.x = x;
                     cube.position.y = 1.6;
@@ -95,15 +97,11 @@
                     return cube;
                 }
 
-                const cubes = [
-                    makeInstance(geometry, 0x44aa88, 0),
-                    makeInstance(geometry, 0x8844aa, -2),
-                    makeInstance(geometry, 0xaa8844, 2),
-                ]
-
-                cubes.forEach((cube) => {
-                    console.log(cube);
-                });
+                // const cubes = [
+                //     makeInstance(geometry, 0x44aa88, 0),
+                //     makeInstance(geometry, 0x8844aa, -2),
+                //     makeInstance(geometry, 0xaa8844, 2),
+                // ]
 
                 class ControllerPickHelper extends THREE.EventDispatcher {
                     constructor(scene) {
@@ -111,6 +109,7 @@
                         this.raycaster = new THREE.Raycaster();
                         this.objectToColorMap = new Map();
                         this.controllerToObjectMap = new Map();
+                        this.controllerToIntersectionMap = new Map();
                         this.tempMatrix = new THREE.Matrix4();
 
                         const pointerGeometry = new THREE.BufferGeometry().setFromPoints([
@@ -122,6 +121,8 @@
 
                         const selectListener = (event) => {
                             const controller = event.target;
+                            const intersection = this.controllerToIntersectionMap.get(controller);
+                            console.log(intersection);
                             const selectedObject = this.controllerToObjectMap.get(event.target);
                             if (selectedObject) {
                                 this.dispatchEvent({ type: event.type, controller, selectedObject });
@@ -130,6 +131,7 @@
 
                         const endListener = (event) => {
                             const controller = event.target;
+                            
                             this.dispatchEvent({ type: event.type, controller });
                         };
 
@@ -151,6 +153,7 @@
                         this.objectToColorMap.forEach((color, object) => {
                             object.material.emissive.setHex(color);
                         });
+                        this.controllerToIntersectionMap.clear();
                         this.objectToColorMap.clear();
                         this.controllerToObjectMap.clear();
                     }
@@ -163,6 +166,7 @@
                             this.raycaster.ray.direction.set(0, 0, -1).applyMatrix4(this.tempMatrix);
                             // get the list of objects the ray intersected
                             const intersections = this.raycaster.intersectObjects(pickablesParent.children);
+                            // console.log(intersections);
                             if (intersections.length) {
                                 const intersection = intersections[0];
                                 // make the line touch the object
@@ -170,7 +174,7 @@
                                 // pick the first object. It's the closest one
                                 const pickedObject = intersection.object;
                                 // save which object this controller picked
-                                // this.controllerToObjectMap.set(controller, pickedObject);
+                                this.controllerToObjectMap.set(controller, pickedObject);
                                 // highlight the object if we haven't already
                                 // if (this.objectToColorMap.get(pickedObject) === undefined) {
                                 //     // save its color
@@ -178,8 +182,8 @@
                                 //     // set its emissive color to flashing red/yellow
                                 //     pickedObject.material.emissive.setHex((time * 8) % 2 > 1 ? 0xFF2000 : 0xFF0000);
                                 // }
-                                
-                                console.log(intersection);
+
+                                this.controllerToIntersectionMap.set(controller, intersection);
                             } else {
                                 line.scale.z = 5;
                             }
@@ -230,12 +234,14 @@
                         camera.updateProjectionMatrix();
                     }
 
-                    cubes.forEach((cube,ndx) => {
-                        const speed = 1 + ndx * 0.1;
-                        const rot = time * speed;
-                        cube.rotation.x = rot;
-                        cube.rotation.y = rot;
-                    });
+                    // cubes.forEach((cube,ndx) => {
+                    //     const speed = 1 + ndx * 0.1;
+                    //     const rot = time * speed;
+                    //     cube.rotation.x = rot;
+                    //     cube.rotation.y = rot;
+                    // });
+
+                    pickHelper.update(pickRoot, time);
 
                     renderer.render(scene, camera);
                 }

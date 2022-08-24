@@ -113,6 +113,7 @@
                         this.raycaster = new THREE.Raycaster();
                         this.objectToColorMap = new Map();
                         this.controllerToObjectMap = new Map();
+                        this.controllerToIntersectionMap = new Map();
                         this.tempMatrix = new THREE.Matrix4();
 
                         const pointerGeometry = new THREE.BufferGeometry().setFromPoints([
@@ -124,6 +125,8 @@
 
                         const selectListener = (event) => {
                             const controller = event.target;
+                            const intersection = this.controllerToIntersectionMap.get(controller);
+                            console.log(intersection);
                             const selectedObject = this.controllerToObjectMap.get(event.target);
                             if (selectedObject) {
                                 this.dispatchEvent({ type: event.type, controller, selectedObject });
@@ -132,6 +135,7 @@
 
                         const endListener = (event) => {
                             const controller = event.target;
+                            this.controllerToIntersectionMap.delete(controller);
                             this.dispatchEvent({ type: event.type, controller });
                         };
 
@@ -180,6 +184,7 @@
                                     // set its emissive color to flashing red/yellow
                                     pickedObject.material.emissive.setHex((time * 8) % 2 > 1 ? 0xFF2000 : 0xFF0000);
                                 }
+                                this.controllerToIntersectionMap.set(controller, intersection);
                             } else {
                                 line.scale.z = 5;
                             }
