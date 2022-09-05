@@ -127,8 +127,16 @@
 
 						const baseReferenceSpace = renderer.xr.getReferenceSpace();
 						console.log(INTERSECTION);
-						const offsetPosition = { x: translationHistory.x - INTERSECTION.x, y: translationHistory.y - INTERSECTION.y + 1.6, z: translationHistory.z - INTERSECTION.z, w: 1 };
-						translationHistory = {x: translationHistory.x + INTERSECTION.x, y: translationHistory.y + INTERSECTION.y - 1.6, z: translationHistory.z + INTERSECTION.z};
+						const offsetPosition = { 
+							x: translationHistory.x - INTERSECTION.x, 
+							y: translationHistory.y - INTERSECTION.y + 1.6, 
+							z: translationHistory.z - INTERSECTION.z, w: 1 
+						};
+						translationHistory = {
+							x: INTERSECTION.x, 
+							y: INTERSECTION.y - 1.6, 
+							z: INTERSECTION.z
+						};
 						console.log(translationHistory);
 						const offsetRotation = new THREE.Quaternion(0,0,0,0);
 						const transform = new XRRigidTransform( offsetPosition, offsetRotation );
