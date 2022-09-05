@@ -53,7 +53,7 @@
 			const aspect = 2;
 			const near = 0.1;
 			const far = 20;
-			const movementTime = 500.0 //in ms, must be floating point number
+			const movementTime = 3000 // in ms
 
 			const gltfLoader = new GLTFLoader();
 			const url = 'media/gltf/custom-cube/cube2.gltf';
@@ -183,6 +183,13 @@
 
 				window.addEventListener( 'resize', onWindowResize, false );
 
+				
+				window.addEventListener('keyup', event => {
+					if (event.key == 114) {
+						renderer.xr.setReferenceSpace();
+					}
+				});
+
 			}
 
 			function buildController( data ) {
@@ -252,11 +259,37 @@
                     w: 1
                 };
 
-                translationHistory = {
-                    x: -translationHistory.x + INTERSECTION.x * elapsedTime / movementTime,
-                    y: -translationHistory.y + (INTERSECTION.y - 1.6) * elapsedTime / movementTime,
-                    z: -translationHistory.z + INTERSECTION.z * elapsedTime / movementTime
+				translationHistory = {
+					x: INTERSECTION.x * elapsedTime / movementTime,
+                    y: (INTERSECTION.y - 1.6) * elapsedTime / movementTime,
+                    z: INTERSECTION.z * elapsedTime / movementTime
+				};
+                const offsetRotation = new THREE.Quaternion();
+                const transform = new XRRigidTransform( offsetPosition, offsetRotation );
+                const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform );
+
+                tpCount++;
+                // console.log(teleportSpaceOffset);
+                renderer.xr.setReferenceSpace( teleportSpaceOffset );
+            }
+
+			function finalMove() {
+                tpTemp = Date.now();
+                const baseReferenceSpace = renderer.xr.getReferenceSpace();
+                // console.log(INTERSECTION);
+                const offsetPosition = {
+                    x: translationHistory.x - INTERSECTION.x,
+                    y: translationHistory.y - (INTERSECTION.y - 1.6),
+                    z: translationHistory.z - INTERSECTION.z,
+                    w: 1
                 };
+
+				translationHistory = {
+					x: INTERSECTION.x,
+					y: INTERSECTION.y - 1.6,
+					z: INTERSECTION.z
+				};
+                
                 const offsetRotation = new THREE.Quaternion();
                 const transform = new XRRigidTransform( offsetPosition, offsetRotation );
                 const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform );
@@ -277,14 +310,15 @@
                     if (Date.now() - tpStart > movementTime) {
                         controller1.userData.isTeleporting = false;
                         controller2.userData.isTeleporting = false;
+						finalMove();
                         console.log("Elapsed time: " + (Date.now() - tpStart));
-                        console.log(translationHistory);
                         console.log(renderer.xr.getReferenceSpace());
-                        tpStart = undefined;
+						console.log(translationHistory);
+						tpStart = undefined;
                         tpTemp = undefined;
                         console.log(tpCount);
                     } else {
-                        teleportAnimate(Date.now() - tpTemp);
+                        teleportAnimate(Date.now() - tpStart);
                     }
 				} else {
 					INTERSECTION = undefined;
