@@ -46,6 +46,7 @@
             let tpStart;
             let tpTemp;
 			let prevPoint;
+			let displayed = false;
 			const tempMatrix = new THREE.Matrix4();
 
 			const clock = new THREE.Clock();
@@ -129,9 +130,10 @@
 
 					if ( INTERSECTION ) {
                         this.userData.isTeleporting = true;
+						displayed = false;
 						console.log("teleporting");
-                        tpStart = Date.now();
-                        tpTemp = Date.now();
+                        tpStart ??= Date.now();
+                        tpTemp ??= Date.now();
 					}
 
 				}
@@ -326,11 +328,23 @@
 						tpStart = undefined;
                         tpTemp = undefined;
                         console.log(tpCount);
+						displayed = false;
                     } else {
                         teleportAnimate(Date.now() - tpStart);
+						if (!displayed) {
+							console.log(controller1.userData.isTeleporting);
+							console.log(controller2.userData.isTeleporting);
+							displayed = true;
+						}
                     }
 				} else {
 					INTERSECTION = undefined;
+					if (!displayed) {
+						console.log(controller1.userData.isTeleporting);
+						console.log(controller2.userData.isTeleporting);
+						console.log(controller1.userData.isTeleporting || controller2.userData.isTeleporting);
+						displayed = true;
+					}
 
 					if ( controller1.userData.isSelecting === true ) {
 
