@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "./threejs/build/three.module.js",
+                    "VRButton": "./threejs/examples/jsm/webxr/VRButton.js",
+                    "GLTFLoader": "./threejs/examples/jsm/loaders/GLTFLoader.js",
+					"BoxLineGeometry": "./threejs/examples/jsm/geometries/BoxLineGeometry.js",
+					"XRControllerModelFactory": "./threejs/examples/jsm/webxr/XRControllerModelFactory.js"
+                }
+            }
+        </script>
+        <style>
+            html, body {
+                margin: 0;
+                height: 100%;
+            }
+
+            #c {
+                width: 100%;
+                height: 100%;
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <script type="module">
+            import * as THREE from 'three';
+
+            import { BoxLineGeometry } from 'BoxLineGeometry';
+            import { VRButton } from 'VRButton';
+            import { XRControllerModelFactory } from 'XRControllerModelFactory';
+            import {GLTFLoader} from 'GLTFLoader';
+            import {LineBasicMaterial, MeshPhongMaterial, DoubleSide} from 'three';
+
+            let container;
+            let camera, scene, renderer;
+            
+            let radius = 10;
+
+            init();
+            animate();
+            function init() {
+                container = document.createElement( 'div' );
+				document.body.appendChild( container );
+                const searchParams = new URLSearchParams(window.location.search);
+                if (searchParams.has('radius')) radius = searchParams.get('radius');
+
+                console.log("radius: " + radius);
+
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xCCCCCC);
+
+                camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, radius * 2 + 5);
+                camera.position.set(0, 1.6, 3);
+
+                // scene.add(new THREE.HemisphereLight(0xCCCCCC, 0x808080));
+                // const light = new THREE.AmbientLight( 0x404040 );
+                // const light = new THREE.PointLight( 0xff0000, 1, 100 );
+                // light.position.set( 50, 50, 50 );
+                const light = new THREE.DirectionalLight( 0xffffff, 0.5 );
+                scene.add( light );
+
+                const geometry = new THREE.SphereGeometry( radius, 50, 32 );
+                const geometry2 = new THREE.SphereGeometry( radius, 50, 32 );
+                const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
+                const lineMaterial = new LineBasicMaterial( { color: 0x000000, transparent: true, opacity: 1 } );
+			    const meshMaterial = new MeshPhongMaterial( { color: 0x156289, emissive: 0x072534, side: DoubleSide, flatShading: true } );
+                const sphere1 = new THREE.Mesh( geometry2, lineMaterial );
+                const sphere2 = new THREE.Mesh( geometry, meshMaterial );
+
+                sphere1.position.x = 0;
+                sphere1.position.y = radius;
+                sphere1.position.z = 0;
+                sphere2.position.x = 0;
+                sphere2.position.y = radius;
+                sphere2.position.z = 0;
+
+                scene.add( sphere1 );
+                scene.add( sphere2 );
+
+                renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.outputEncoding = THREE.sRGBEncoding;
+				renderer.shadowMap.enabled = true;
+				renderer.xr.enabled = true;
+				container.appendChild( renderer.domElement );
+
+				document.body.appendChild( VRButton.createButton( renderer ) );
+                window.addEventListener( 'resize', onWindowResize );
+            }
+
+            function onWindowResize() {
+
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+
+                renderer.setSize( window.innerWidth, window.innerHeight );
+
+            }
+
+            function animate() {
+                renderer.setAnimationLoop(render);
+            }
+
+            function render() {
+                renderer.render(scene, camera);
+            }
+        </script>
+    </body>
+</html>
