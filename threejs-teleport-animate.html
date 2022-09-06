@@ -45,6 +45,7 @@
 			let INTERSECTION;
             let tpStart;
             let tpTemp;
+			let prevPoint;
 			const tempMatrix = new THREE.Matrix4();
 
 			const clock = new THREE.Clock();
@@ -87,16 +88,16 @@
 				scene.add( light );
 
 				marker = new THREE.Mesh(
-					new THREE.SphereGeometry( 10, 10, 10 ).rotateX( - Math.PI / 2 ),
+					new THREE.SphereGeometry( 100, 100, 100 ).rotateX( - Math.PI / 2 ),
 					new THREE.MeshBasicMaterial( { color: 0x808080 } )
 				);
 				scene.add( marker );
 
-				floor = new THREE.Mesh(
-					new THREE.PlaneGeometry( 4.8, 4.8, 2, 2 ).rotateX( - Math.PI / 2 ),
-					new THREE.MeshBasicMaterial( { color: 0x808080, transparent: true, opacity: 0.25 } )
-				);
-				scene.add( floor );
+				// floor = new THREE.Mesh(
+				// 	new THREE.PlaneGeometry( 4.8, 4.8, 2, 2 ).rotateX( - Math.PI / 2 ),
+				// 	new THREE.MeshBasicMaterial( { color: 0x808080, transparent: true, opacity: 0.25 } )
+				// );
+				// scene.add( floor );
 
 				raycaster = new THREE.Raycaster();
 
@@ -190,6 +191,11 @@
 					}
 				});
 
+				prevPoint = {
+					x: 0,
+					y: 0,
+					z: 0
+				};
 			}
 
 			function buildController( data ) {
@@ -250,20 +256,21 @@
             let tpCount = 0;
             function teleportAnimate(elapsedTime) {
                 tpTemp = Date.now();
+				renderer.xr.setReferenceSpace();
                 const baseReferenceSpace = renderer.xr.getReferenceSpace();
                 // console.log(INTERSECTION);
                 const offsetPosition = {
-                    x: translationHistory.x - INTERSECTION.x * elapsedTime / movementTime,
-                    y: translationHistory.y - (INTERSECTION.y - 1.6) * elapsedTime / movementTime,
-                    z: translationHistory.z - INTERSECTION.z * elapsedTime / movementTime,
+                    x: - prevPoint.x - (INTERSECTION.x - prevPoint.x) * elapsedTime / movementTime,
+                    y: - prevPoint.y - (INTERSECTION.y - 1.6 - prevPoint.y) * elapsedTime / movementTime,
+                    z: - prevPoint.z - (INTERSECTION.z - prevPoint.z) * elapsedTime / movementTime,
                     w: 1
                 };
 
-				translationHistory = {
-					x: INTERSECTION.x * elapsedTime / movementTime,
-                    y: (INTERSECTION.y - 1.6) * elapsedTime / movementTime,
-                    z: INTERSECTION.z * elapsedTime / movementTime
-				};
+				// translationHistory = {
+				// 	x: (INTERSECTION.x + prevPoint.x) * elapsedTime / movementTime,
+                //     y: (INTERSECTION.y - 1.6 + prevPoint.y) * elapsedTime / movementTime,
+                //     z: (INTERSECTION.z + prevPoint.z) * elapsedTime / movementTime
+				// };
                 const offsetRotation = new THREE.Quaternion();
                 const transform = new XRRigidTransform( offsetPosition, offsetRotation );
                 const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform );
@@ -275,12 +282,13 @@
 
 			function finalMove() {
                 tpTemp = Date.now();
+				renderer.xr.setReferenceSpace();
                 const baseReferenceSpace = renderer.xr.getReferenceSpace();
                 // console.log(INTERSECTION);
                 const offsetPosition = {
-                    x: translationHistory.x - INTERSECTION.x,
-                    y: translationHistory.y - (INTERSECTION.y - 1.6),
-                    z: translationHistory.z - INTERSECTION.z,
+                    x:  - INTERSECTION.x,
+                    y:  - (INTERSECTION.y - 1.6),
+                    z:  - INTERSECTION.z,
                     w: 1
                 };
 
@@ -289,6 +297,8 @@
 					y: INTERSECTION.y - 1.6,
 					z: INTERSECTION.z
 				};
+
+				prevPoint = translationHistory;
                 
                 const offsetRotation = new THREE.Quaternion();
                 const transform = new XRRigidTransform( offsetPosition, offsetRotation );
