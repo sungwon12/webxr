@@ -129,6 +129,7 @@
 
 					if ( INTERSECTION ) {
                         this.userData.isTeleporting = true;
+						console.log("teleporting");
                         tpStart = Date.now();
                         tpTemp = Date.now();
 					}
@@ -292,13 +293,11 @@
                     w: 1
                 };
 
-				translationHistory = {
+				prevPoint = {
 					x: INTERSECTION.x,
 					y: INTERSECTION.y - 1.6,
 					z: INTERSECTION.z
 				};
-
-				prevPoint = translationHistory;
                 
                 const offsetRotation = new THREE.Quaternion();
                 const transform = new XRRigidTransform( offsetPosition, offsetRotation );
