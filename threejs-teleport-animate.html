@@ -44,7 +44,6 @@
 
 			let INTERSECTION;
             let tpStart;
-            let tpTemp;
 			let prevPoint;
 			let displayed = false;
 			const tempMatrix = new THREE.Matrix4();
@@ -133,7 +132,6 @@
 						displayed = false;
 						console.log("teleporting");
                         tpStart ??= Date.now();
-                        tpTemp ??= Date.now();
 					}
 
 				}
@@ -258,7 +256,6 @@
 
             let tpCount = 0;
             function teleportAnimate(elapsedTime) {
-                tpTemp = Date.now();
 				renderer.xr.setReferenceSpace();
                 const baseReferenceSpace = renderer.xr.getReferenceSpace();
                 // console.log(INTERSECTION);
@@ -269,11 +266,6 @@
                     w: 1
                 };
 
-				// translationHistory = {
-				// 	x: (INTERSECTION.x + prevPoint.x) * elapsedTime / movementTime,
-                //     y: (INTERSECTION.y - 1.6 + prevPoint.y) * elapsedTime / movementTime,
-                //     z: (INTERSECTION.z + prevPoint.z) * elapsedTime / movementTime
-				// };
                 const offsetRotation = new THREE.Quaternion();
                 const transform = new XRRigidTransform( offsetPosition, offsetRotation );
                 const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform );
@@ -284,7 +276,6 @@
             }
 
 			function finalMove() {
-                tpTemp = Date.now();
 				renderer.xr.setReferenceSpace();
                 const baseReferenceSpace = renderer.xr.getReferenceSpace();
                 // console.log(INTERSECTION);
@@ -306,7 +297,6 @@
                 const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform );
 
                 tpCount++;
-                // console.log(teleportSpaceOffset);
                 renderer.xr.setReferenceSpace( teleportSpaceOffset );
             }
 
@@ -322,11 +312,7 @@
                         controller1.userData.isTeleporting = false;
                         controller2.userData.isTeleporting = false;
 						finalMove();
-                        console.log("Elapsed time: " + (Date.now() - tpStart));
-                        console.log(renderer.xr.getReferenceSpace());
-						console.log(translationHistory);
 						tpStart = undefined;
-                        tpTemp = undefined;
                         console.log(tpCount);
 						displayed = false;
                     } else {

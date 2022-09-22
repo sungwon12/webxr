@@ -36,16 +36,30 @@
             import {LineBasicMaterial, MeshPhongMaterial, DoubleSide} from 'three';
 
             let container;
-            let camera, scene, renderer;
-            let room;
-            
+            let camera, scene, raycaster, renderer;
+            let controller1, controller2;
+			let controllerGrip1, controllerGrip2;
+            let room, marker;
+            let sphereCenter;
             let radius = 10;
+
+            let intersection, prevPoint;
+            let tpStart;
+
+            const tempMatrix = new THREE.Matrix4();
+
+            const fov = 100;
+			const aspect = 2;
+			const near = 0.1;
+			const far = 20;
+			const movementTime = 3000 // in ms
 
             const gltfLoader = new GLTFLoader();
 			const url = 'media/gltf/sphere/dodecahedron.gltf';
 
             init();
             animate();
+
             function init() {
                 container = document.createElement( 'div' );
 				document.body.appendChild( container );
@@ -71,6 +85,8 @@
                     room.scale.set(radius / 10, radius / 10, radius / 10);
 					scene.add(room);
 				});
+
+                raycaster = new THREE.Raycaster();
 
                 renderer = new THREE.WebGLRenderer( { antialias: true } );
 				renderer.setPixelRatio( window.devicePixelRatio );
