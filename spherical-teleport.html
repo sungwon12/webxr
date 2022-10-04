@@ -72,16 +72,22 @@
                 camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, radius * 2 + 5);
                 camera.position.set(0, 1.6, 3);
 
-                // gltfLoader.load(url, (gltf) => {
-                //     room = gltf.scene;
-                //     room.scale.set(radius / 10, radius / 10, radius / 10);
-                //     scene.add(room);
-                // });
+                gltfLoader.load(url, (gltf) => {
+                    room = gltf.scene;
+                    room.scale.set(radius / 10, radius / 10, radius / 10);
+                    scene.add(room);
+                });
 
-                sphere = new THREE.Mesh(
-                    new THREE.SphereGeometry(7, 50, 32),
-                    new THREE.MeshBasicMaterial({color: 0x000000})
-                    );
+                let spGeo = new THREE.SphereGeometry(radius * 0.99, 32, 16);
+                let spMat = new THREE.MeshPhongMaterial({color: 0x303030, side: DoubleSide});
+
+                sphere = new THREE.Mesh(spGeo, spMat);
+                sphere.position.y = radius;
+
+                // sphere = new THREE.Mesh(
+                //     new THREE.SphereGeometry(7, 50, 32),
+                //     new THREE.MeshBasicMaterial({color: 0xFFFFFF})
+                //     );
                 sphere.visible = true;
                 console.log(sphere);
                 scene.add( sphere );
@@ -99,9 +105,10 @@
                 scene.add( light );
 
 
-                const geometry = new THREE.BufferGeometry();
-                geometry.setFromPoints( [ new THREE.Vector3(), new THREE.Vector3() ] );
-                line = new THREE.Line( geometry, new THREE.LineBasicMaterial() );
+                const lineGeo = new THREE.BufferGeometry();
+                lineGeo.setFromPoints( [ new THREE.Vector3(), new THREE.Vector3() ] );
+                line = new THREE.Line( lineGeo, new THREE.LineBasicMaterial({color: 0x000000}) );
+                
                 scene.add( line );
                 console.log(line);
 
@@ -349,15 +356,16 @@
                     }
 
                     if (intersection) {
+                        console.log(intersection);
                         const positions = line.geometry.attributes.position;
                         const p = intersection.point;
                         const n = intersection.face.normal.clone();
                         n.transformDirection( sphere.matrixWorld );
-						n.multiplyScalar( 10000 );
+						n.multiplyScalar( -radius );
 						n.add( intersection.point );
-						positions.setXYZ( 0, p.x, p.y, p.z );
-						positions.setXYZ( 1, n.x, n.y, n.z );
-						positions.needsUpdate = true;
+						line.geometry.attributes.position.setXYZ( 0, p.x, p.y, p.z );
+						line.geometry.attributes.position.setXYZ( 1, n.x, n.y, n.z );
+						line.geometry.attributes.position.needsUpdate = true;
                         console.log(n);
                     }
                 }
