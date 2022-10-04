@@ -1,237 +1,369 @@
 <!DOCTYPE html>
-<head>
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "./threejs/build/three.module.js",
-                "VRButton": "./threejs/examples/jsm/webxr/VRButton.js",
-                "GLTFLoader": "./threejs/examples/jsm/loaders/GLTFLoader.js",
-                "BoxLineGeometry": "./threejs/examples/jsm/geometries/BoxLineGeometry.js",
-                "XRControllerModelFactory": "./threejs/examples/jsm/webxr/XRControllerModelFactory.js"
+<html>
+    <head>
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "./threejs/build/three.module.js",
+                    "VRButton": "./threejs/examples/jsm/webxr/VRButton.js",
+                    "GLTFLoader": "./threejs/examples/jsm/loaders/GLTFLoader.js",
+                    "BoxLineGeometry": "./threejs/examples/jsm/geometries/BoxLineGeometry.js",
+                    "XRControllerModelFactory": "./threejs/examples/jsm/webxr/XRControllerModelFactory.js"
+                }
             }
-        }
-    </script>
-    <style>
-        html, body {
-            margin: 0;
-            height: 100%;
-        }
-
-        #c {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-    </style>
-</head>
-<body>
-    <script type="module">
-        import * as THREE from 'three';
-
-        import { BoxLineGeometry } from 'BoxLineGeometry';
-        import { VRButton } from 'VRButton';
-        import { XRControllerModelFactory } from 'XRControllerModelFactory';
-        import {GLTFLoader} from 'GLTFLoader';
-        import {LineBasicMaterial, MeshPhongMaterial, DoubleSide} from 'three';
-
-        let container;
-        let camera, scene, raycaster, renderer;
-        let controller1, controller2;
-        let controllerGrip1, controllerGrip2;
-        let radius = 10;
-        let sphere, sphereCenter;
-        let room, marker;
-
-        let intersection, prevPoint;
-        let tpStart;
-
-        const tempMatrix = new THREE.Matrix4();
-
-        const fov = 100;
-        const aspect = 2;
-        const near = 0.1;
-        const far = 20;
-        const movementTime = 3000 // in ms
-
-        const gltfLoader = new GLTFLoader();
-        const url = 'media/gltf/sphere/dodecahedron.gltf';
-
-        init();
-        animate();
-
-        function init() {
-            container = document.createElement( 'div' );
-            document.body.appendChild( container );
-            const searchParams = new URLSearchParams(window.location.search);
-            if (searchParams.has('radius')) radius = searchParams.get('radius');
-
-            gltfLoader.load(url, (gltf) => {
-                room = gltf.scene;
-                room.scale.set(radius / 10, radius / 10, radius / 10);
-                scene.add(room);
-            });
-
-            sphere = new THREE.Mesh(
-                new THREE.SphereGeometry(radius, 50, 32),
-                new THREE.MeshBAsicMaterial()
-            );
-
-            raycaster = new THREE.Raycaster();
-
-            renderer = new THREE.WebGLRenderer( { antialias: true } );
-            renderer.setPixelRatio( window.devicePixelRatio );
-            renderer.setSize( window.innerWidth, window.innerHeight );
-            renderer.outputEncoding = THREE.sRGBEncoding;
-            renderer.shadowMap.enabled = true;
-            renderer.xr.enabled = true;
-            container.appendChild( renderer.domElement );
-
-            document.body.appendChild( VRButton.createButton( renderer ) );
-            window.addEventListener( 'resize', onWindowResize );
-
-            // controllers
-
-				function onSelectStart() {
-
-					this.userData.isSelecting = true;
-
-				}
-
-				function onSelectEnd() {
-
-					this.userData.isSelecting = false;
-
-					if ( intersection ) {
-                        this.userData.isTeleporting = true;
-						displayed = false;
-						console.log("teleporting");
-                        tpStart ??= Date.now();
-					}
-
-				}
-
-				controller1 = renderer.xr.getController( 0 );
-				controller1.addEventListener( 'selectstart', onSelectStart );
-				controller1.addEventListener( 'selectend', onSelectEnd );
-				controller1.addEventListener( 'connected', function ( event ) {
-
-					this.add( buildController( event.data ) );
-
-				} );
-				controller1.addEventListener( 'disconnected', function () {
-
-					this.remove( this.children[ 0 ] );
-
-				} );
-				scene.add( controller1 );
-
-				controller2 = renderer.xr.getController( 1 );
-				controller2.addEventListener( 'selectstart', onSelectStart );
-				controller2.addEventListener( 'selectend', onSelectEnd );
-				controller2.addEventListener( 'connected', function ( event ) {
-
-					this.add( buildController( event.data ) );
-
-				} );
-				controller2.addEventListener( 'disconnected', function () {
-
-					this.remove( this.children[ 0 ] );
-
-				} );
-				scene.add( controller2 );
-
-				// The XRControllerModelFactory will automatically fetch controller models
-				// that match what the user is holding as closely as possible. The models
-				// should be attached to the object returned from getControllerGrip in
-				// order to match the orientation of the held device.
-
-				const controllerModelFactory = new XRControllerModelFactory();
-
-				controllerGrip1 = renderer.xr.getControllerGrip( 0 );
-				controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
-				scene.add( controllerGrip1 );
-
-				controllerGrip2 = renderer.xr.getControllerGrip( 1 );
-				controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
-				scene.add( controllerGrip2 );
-        }
-
-        function onWindowResize() {
-
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-
-            renderer.setSize( window.innerWidth, window.innerHeight );
-
-        }
-
-        function buildController( data ) {
-
-            let geometry, material;
-
-            switch ( data.targetRayMode ) {
-
-                case 'tracked-pointer':
-
-                    geometry = new THREE.BufferGeometry();
-                    geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( [ 0, 0, 0, 0, 0, - 1 ], 3 ) );
-                    geometry.setAttribute( 'color', new THREE.Float32BufferAttribute( [ 0.5, 0.5, 0.5, 0, 0, 0 ], 3 ) );
-
-                    material = new THREE.LineBasicMaterial( { vertexColors: true, blending: THREE.AdditiveBlending } );
-
-                    return new THREE.Line( geometry, material );
-
-                case 'gaze':
-
-                    geometry = new THREE.RingGeometry( 0.02, 0.04, 32 ).translate( 0, 0, - 1 );
-                    material = new THREE.MeshBasicMaterial( { opacity: 0.5, transparent: true } );
-                    return new THREE.Mesh( geometry, material );
-
+        </script>
+        <style>
+            html, body {
+                margin: 0;
+                height: 100%;
             }
 
-        }
-
-        function handleController( controller ) {
-
-            if ( controller.userData.isSelecting ) {
-
-                const object = room.children[ count ++ ];
-
-                object.position.copy( controller.position );
-                object.userData.velocity.x = ( Math.random() - 0.5 ) * 3;
-                object.userData.velocity.y = ( Math.random() - 0.5 ) * 3;
-                object.userData.velocity.z = ( Math.random() - 9 );
-                object.userData.velocity.applyQuaternion( controller.quaternion );
-
-                if ( count === room.children.length ) count = 0;
-
+            #c {
+                width: 100%;
+                height: 100%;
+                display: block;
             }
+        </style>
+    </head>
+    <body>
+        <script type="module">
+            import * as THREE from 'three';
 
-        }
+            import { BoxLineGeometry } from 'BoxLineGeometry';
+            import { VRButton } from 'VRButton';
+            import { XRControllerModelFactory } from 'XRControllerModelFactory';
+            import {GLTFLoader} from 'GLTFLoader';
+            import {LineBasicMaterial, MeshPhongMaterial, DoubleSide} from 'three';
 
-        function animate() {
-            renderer.setAnimationLoop(render);
-        }
+            let container;
+            let camera, scene, raycaster, renderer;
+            let controller1, controller2;
+            let controllerGrip1, controllerGrip2;
+            let radius = 10;
+            let sphere, sphereCenter;
+            let room;
+            let line;
 
-        function render() {
-            intersection = undefined;
-            if (controller1.userData.isSelecting === true) {
-                tempMatrix.identity().extractRotation( controller1.matrixWorld );
+            let intersection, prevPoint;
+            let tpStart;
+			let displayed = false;
 
-                raycaster.ray.origin.setFromMatrixPosition( controller1.matrixWorld );
-                raycaster.ray.direction.set( 0, 0, - 1 ).applyMatrix4( tempMatrix );
+            const tempMatrix = new THREE.Matrix4();
 
-                const intersects = raycaster.intersectObjects( [ sphere ] );
+            const fov = 100;
+            const aspect = 2;
+            const near = 0.1;
+            const far = 20;
+            const movementTime = 3000 // in ms
 
-                if ( intersects.length > 0 ) {
+            const gltfLoader = new GLTFLoader();
+            const url = 'media/gltf/sphere/dodecahedron.gltf';
 
-                    intersection = intersects[ 0 ].point;
+            init();
+            animate();
+
+            function init() {
+                const searchParams = new URLSearchParams(window.location.search);
+                if (searchParams.has('radius')) radius = searchParams.get('radius');
+
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xCCCC00);
+
+                camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, radius * 2 + 5);
+                camera.position.set(0, 1.6, 3);
+
+                // gltfLoader.load(url, (gltf) => {
+                //     room = gltf.scene;
+                //     room.scale.set(radius / 10, radius / 10, radius / 10);
+                //     scene.add(room);
+                // });
+
+                sphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(7, 50, 32),
+                    new THREE.MeshBasicMaterial({color: 0x000000})
+                    );
+                sphere.visible = true;
+                console.log(sphere);
+                scene.add( sphere );
+                
+                // reference for teleportation
+				prevPoint = {
+					x: 0,
+					y: 0,
+					z: 0
+				};
+
+                let light = new THREE.PointLight( 0x404040 );
+                light.position.set( 0, 1.8 * radius, 0 );
+
+                scene.add( light );
+
+
+                const geometry = new THREE.BufferGeometry();
+                geometry.setFromPoints( [ new THREE.Vector3(), new THREE.Vector3() ] );
+                line = new THREE.Line( geometry, new THREE.LineBasicMaterial() );
+                scene.add( line );
+                console.log(line);
+
+                raycaster = new THREE.Raycaster();
+
+                renderer = new THREE.WebGLRenderer( { antialias: true } );
+                renderer.setPixelRatio( window.devicePixelRatio );
+                renderer.setSize( window.innerWidth, window.innerHeight );
+                renderer.outputEncoding = THREE.sRGBEncoding;
+                renderer.shadowMap.enabled = true;
+                renderer.xr.enabled = true;
+                document.body.appendChild( renderer.domElement );
+
+                document.body.appendChild( VRButton.createButton( renderer ) );
+                window.addEventListener( 'resize', onWindowResize );
+
+                // controllers
+
+                function onSelectStart() {
+
+                    this.userData.isSelecting = true;
 
                 }
-            } else if (controller2.userData.isSelecting === true) {
+
+                function onSelectEnd() {
+
+                    this.userData.isSelecting = false;
+
+                    if ( intersection ) {
+                        this.userData.isTeleporting = true;
+                        displayed = false;
+                        console.log("teleporting");
+                        tpStart ??= Date.now();
+                    }
+
+                }
+
+                controller1 = renderer.xr.getController( 0 );
+                controller1.addEventListener( 'selectstart', onSelectStart );
+                controller1.addEventListener( 'selectend', onSelectEnd );
+                controller1.addEventListener( 'connected', function ( event ) {
+
+                    this.add( buildController( event.data ) );
+
+                } );
+                controller1.addEventListener( 'disconnected', function () {
+
+                    this.remove( this.children[ 0 ] );
+
+                } );
+                scene.add( controller1 );
+
+                controller2 = renderer.xr.getController( 1 );
+                controller2.addEventListener( 'selectstart', onSelectStart );
+                controller2.addEventListener( 'selectend', onSelectEnd );
+                controller2.addEventListener( 'connected', function ( event ) {
+
+                    this.add( buildController( event.data ) );
+
+                } );
+                controller2.addEventListener( 'disconnected', function () {
+
+                    this.remove( this.children[ 0 ] );
+
+                } );
+                scene.add( controller2 );
+
+                // The XRControllerModelFactory will automatically fetch controller models
+                // that match what the user is holding as closely as possible. The models
+                // should be attached to the object returned from getControllerGrip in
+                // order to match the orientation of the held device.
+
+                const controllerModelFactory = new XRControllerModelFactory();
+
+                controllerGrip1 = renderer.xr.getControllerGrip( 0 );
+                controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
+                scene.add( controllerGrip1 );
+
+                controllerGrip2 = renderer.xr.getControllerGrip( 1 );
+                controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
+                scene.add( controllerGrip2 );
+            }
+
+            function onWindowResize() {
+
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+
+                renderer.setSize( window.innerWidth, window.innerHeight );
 
             }
-            renderer.render(scene, camera);
-        }
-    </script>
-</body>
+
+            function buildController( data ) {
+
+                let geometry, material;
+
+                switch ( data.targetRayMode ) {
+
+                    case 'tracked-pointer':
+
+                        geometry = new THREE.BufferGeometry();
+                        geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( [ 0, 0, 0, 0, 0, - 1 ], 3 ) );
+                        geometry.setAttribute( 'color', new THREE.Float32BufferAttribute( [ 0.5, 0.5, 0.5, 0, 0, 0 ], 3 ) );
+
+                        material = new THREE.LineBasicMaterial( { vertexColors: true, blending: THREE.AdditiveBlending } );
+
+                        return new THREE.Line( geometry, material );
+
+                    case 'gaze':
+
+                        geometry = new THREE.RingGeometry( 0.02, 0.04, 32 ).translate( 0, 0, - 1 );
+                        material = new THREE.MeshBasicMaterial( { opacity: 0.5, transparent: true } );
+                        return new THREE.Mesh( geometry, material );
+
+                }
+
+            }
+
+            function handleController( controller ) {
+
+                if ( controller.userData.isSelecting ) {
+
+                    const object = sphere.children[ count ++ ];
+
+                    object.position.copy( controller.position );
+                    object.userData.velocity.x = ( Math.random() - 0.5 ) * 3;
+                    object.userData.velocity.y = ( Math.random() - 0.5 ) * 3;
+                    object.userData.velocity.z = ( Math.random() - 9 );
+                    object.userData.velocity.applyQuaternion( controller.quaternion );
+
+                    if ( count === sphere.children.length ) count = 0;
+
+                }
+
+            }
+
+            let tpCount = 0;
+            function teleportAnimate(elapsedTime) {
+                renderer.xr.setReferenceSpace();
+                const baseReferenceSpace = renderer.xr.getReferenceSpace();
+                // console.log(INTERSECTION);
+                const offsetPosition = {
+                    x: - prevPoint.x - (intersection.point.x - prevPoint.x) * elapsedTime / movementTime,
+                    y: - prevPoint.y - (intersection.point.y - 1.6 - prevPoint.y) * elapsedTime / movementTime,
+                    z: - prevPoint.z - (intersection.point.z - prevPoint.z) * elapsedTime / movementTime,
+                    w: 1
+                };
+
+                const offsetRotation = new THREE.Quaternion();
+                const transform = new XRRigidTransform( offsetPosition, offsetRotation );
+                const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform );
+
+                tpCount++;
+                // console.log(teleportSpaceOffset);
+                renderer.xr.setReferenceSpace( teleportSpaceOffset );
+            }
+
+            function finalMove() {
+                renderer.xr.setReferenceSpace();
+                const baseReferenceSpace = renderer.xr.getReferenceSpace();
+                // console.log(INTERSECTION);
+                const offsetPosition = {
+                    x:  - intersection.point.x,
+                    y:  - (intersection.point.y - 1.6),
+                    z:  - intersection.point.z,
+                    w: 1
+                };
+
+                prevPoint = {
+                    x: intersection.point.x,
+                    y: intersection.point.y - 1.6,
+                    z: intersection.point.z
+                };
+                
+                const offsetRotation = new THREE.Quaternion();
+                const transform = new XRRigidTransform( offsetPosition, offsetRotation );
+                const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform );
+
+                tpCount++;
+                renderer.xr.setReferenceSpace( teleportSpaceOffset );
+            }
+
+            function animate() {
+
+                renderer.setAnimationLoop( render );
+
+            }
+
+            function render() {
+                if (controller1.userData.isTeleporting || controller2.userData.isTeleporting) {
+                    if (Date.now() - tpStart > movementTime) {
+                        controller1.userData.isTeleporting = false;
+                        controller2.userData.isTeleporting = false;
+                        finalMove();
+                        tpStart = undefined;
+                        console.log(tpCount);
+                        displayed = false;
+                    } else {
+                        teleportAnimate(Date.now() - tpStart);
+                        if (!displayed) {
+                            console.log(controller1.userData.isTeleporting);
+                            console.log(controller2.userData.isTeleporting);
+                            displayed = true;
+                        }
+                    }
+                } else {
+                    intersection = undefined;
+                    if (!displayed) {
+                        console.log(controller1.userData.isTeleporting);
+                        console.log(controller2.userData.isTeleporting);
+                        console.log(controller1.userData.isTeleporting || controller2.userData.isTeleporting);
+                        displayed = true;
+                    }
+
+                    if ( controller1.userData.isSelecting === true ) {
+
+                        tempMatrix.identity().extractRotation( controller1.matrixWorld );
+
+                        raycaster.ray.origin.setFromMatrixPosition( controller1.matrixWorld );
+                        raycaster.ray.direction.set( 0, 0, - 1 ).applyMatrix4( tempMatrix );
+
+                        const intersects = raycaster.intersectObjects( [ sphere ] );
+
+                        if ( intersects.length > 0 ) {
+
+                            intersection = intersects[ 0 ];
+
+                        }
+
+                    } else if ( controller2.userData.isSelecting === true ) {
+
+                        tempMatrix.identity().extractRotation( controller2.matrixWorld );
+
+                        raycaster.ray.origin.setFromMatrixPosition( controller2.matrixWorld );
+                        raycaster.ray.direction.set( 0, 0, - 1 ).applyMatrix4( tempMatrix );
+
+                        const intersects = raycaster.intersectObjects( [ sphere ] );
+
+                        if ( intersects.length > 0 ) {
+
+                            intersection = intersects[ 0 ];
+
+                        }
+
+                    }
+
+                    if (intersection) {
+                        const positions = line.geometry.attributes.position;
+                        const p = intersection.point;
+                        const n = intersection.face.normal.clone();
+                        n.transformDirection( sphere.matrixWorld );
+						n.multiplyScalar( 10000 );
+						n.add( intersection.point );
+						positions.setXYZ( 0, p.x, p.y, p.z );
+						positions.setXYZ( 1, n.x, n.y, n.z );
+						positions.needsUpdate = true;
+                        console.log(n);
+                    }
+                }
+                renderer.render( scene, camera );
+
+            }
+        </script>
+    </body>
+</html>

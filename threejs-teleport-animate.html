@@ -39,8 +39,7 @@
 			let controller1, controller2;
 			let controllerGrip1, controllerGrip2;
 
-			let translationHistory;
-			let room, marker, floor;
+			let room;
 
 			let INTERSECTION;
             let tpStart;
@@ -70,37 +69,30 @@
 				camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, near, far );
 				camera.position.set( 0, 1.6, 0 );
 
-				// room = new THREE.LineSegments(
-				// 	new BoxLineGeometry( 6, 6, 6, 10, 10, 10 ).translate( 0, 3, 0 ),
-				// 	new THREE.LineBasicMaterial( { color: 0x808080 } )
-				// );
-				// scene.add( room );
-
+				// load gltf
 				gltfLoader.load(url, (gltf) => {
 					room = gltf.scene;
 					scene.add(room);
 				});
 
+				// reference for teleportation
+				prevPoint = {
+					x: 0,
+					y: 0,
+					z: 0
+				};
+
+				// add light
 				scene.add( new THREE.HemisphereLight( 0x606060, 0x404040 ) );
 
 				const light = new THREE.DirectionalLight( 0xffffff );
 				light.position.set( 1, 1, 1 ).normalize();
 				scene.add( light );
 
-				marker = new THREE.Mesh(
-					new THREE.SphereGeometry( 100, 100, 100 ).rotateX( - Math.PI / 2 ),
-					new THREE.MeshBasicMaterial( { color: 0x808080 } )
-				);
-				scene.add( marker );
-
-				// floor = new THREE.Mesh(
-				// 	new THREE.PlaneGeometry( 4.8, 4.8, 2, 2 ).rotateX( - Math.PI / 2 ),
-				// 	new THREE.MeshBasicMaterial( { color: 0x808080, transparent: true, opacity: 0.25 } )
-				// );
-				// scene.add( floor );
-
+				// raycaster for controllers
 				raycaster = new THREE.Raycaster();
 
+				// 
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
@@ -108,12 +100,8 @@
 				renderer.xr.enabled = true;
 				document.body.appendChild( renderer.domElement );
 
-				//
-
+				// add "Enter VR" button
 				document.body.appendChild( VRButton.createButton( renderer ) );
-
-				translationHistory = { x: 0.0, y: 0.0, z: 0.0};
-				// baseReferenceSpace = renderer.xr.getReferenceSpace();
 
 				// controllers
 
@@ -184,19 +172,6 @@
 				//
 
 				window.addEventListener( 'resize', onWindowResize, false );
-
-				
-				window.addEventListener('keyup', event => {
-					if (event.key == 114) {
-						renderer.xr.setReferenceSpace();
-					}
-				});
-
-				prevPoint = {
-					x: 0,
-					y: 0,
-					z: 0
-				};
 			}
 
 			function buildController( data ) {
