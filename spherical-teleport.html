@@ -47,6 +47,8 @@
             let intersection, prevPoint;
             let tpStart;
 			let displayed = false;
+            let startNormal = new THREE.Vector3(0, 1, 0);
+            let targetNormal;
 
             const tempMatrix = new THREE.Matrix4();
 
@@ -249,7 +251,6 @@
             function teleportAnimate(elapsedTime) {
                 renderer.xr.setReferenceSpace();
                 const baseReferenceSpace = renderer.xr.getReferenceSpace();
-                // console.log(INTERSECTION);
                 const offsetPosition = {
                     x: - prevPoint.x - (intersection.point.x - prevPoint.x) * elapsedTime / movementTime,
                     y: - prevPoint.y - (intersection.point.y - 1.6 - prevPoint.y) * elapsedTime / movementTime,
@@ -262,14 +263,13 @@
                 const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform );
 
                 tpCount++;
-                // console.log(teleportSpaceOffset);
                 renderer.xr.setReferenceSpace( teleportSpaceOffset );
             }
 
             function finalMove() {
                 renderer.xr.setReferenceSpace();
                 const baseReferenceSpace = renderer.xr.getReferenceSpace();
-                // console.log(INTERSECTION);
+
                 const offsetPosition = {
                     x:  - intersection.point.x,
                     y:  - (intersection.point.y - 1.6),
@@ -283,7 +283,15 @@
                     z: intersection.point.z
                 };
                 
-                const offsetRotation = new THREE.Quaternion();
+                // fixing
+                // const offsetRotation = new THREE.Quaternion();
+
+                // testing
+                const rotationAxis = new THREE.Vector3().crossVectors(startNormal, targetNormal);
+                const rotationRadian = startNormal.angleTo(targetNormal);
+
+                const offsetRotation = new THREE.Quaternion().setFromAxisAngle(rotationAxis, -rotationRadian);
+
                 const transform = new XRRigidTransform( offsetPosition, offsetRotation );
                 const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform );
 
@@ -299,7 +307,7 @@
 
             function render() {
                 if (controller1.userData.isTeleporting || controller2.userData.isTeleporting) {
-                    if (Date.now() - tpStart > movementTime) {
+                    if (Date.now() - tpStart < movementTime) { // flip inequality when done
                         controller1.userData.isTeleporting = false;
                         controller2.userData.isTeleporting = false;
                         finalMove();
@@ -312,6 +320,9 @@
                             console.log(controller1.userData.isTeleporting);
                             console.log(controller2.userData.isTeleporting);
                             displayed = true;
+
+                            // quaternion test here
+
                         }
                     }
                 } else {
@@ -360,6 +371,7 @@
                         const positions = line.geometry.attributes.position;
                         const p = intersection.point;
                         const n = intersection.face.normal.clone();
+                        targetNormal = n;
                         n.transformDirection( sphere.matrixWorld );
 						n.multiplyScalar( -radius );
 						n.add( intersection.point );
