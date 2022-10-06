@@ -45,6 +45,7 @@
             let line;
 
             let intersection, prevPoint;
+            let prevRotation = new THREE.Quaternion();
             let tpStart;
 			let displayed = false;
             let startNormal = new THREE.Vector3(0, 1, 0);
@@ -81,10 +82,15 @@
                 });
 
                 let spGeo = new THREE.SphereGeometry(radius * 0.99, 32, 16);
+                let spGeo2 = new THREE.SphereGeometry(1, 32, 16);
+                let spGeo3 = new THREE.SphereGeometry(1, 32, 16);
                 let spMat = new THREE.MeshPhongMaterial({color: 0x303030, side: DoubleSide});
+                let spMat2 = new THREE.MeshPhongMaterial({color: 0xFFFFFF, side: DoubleSide});
 
                 sphere = new THREE.Mesh(spGeo, spMat);
                 sphere.position.y = radius;
+                let sphere2 = new THREE.Mesh(spGeo3, spMat2);
+                sphere2.position.y = radius * 2;
 
                 // sphere = new THREE.Mesh(
                 //     new THREE.SphereGeometry(7, 50, 32),
@@ -93,6 +99,8 @@
                 sphere.visible = true;
                 console.log(sphere);
                 scene.add( sphere );
+                scene.add(new THREE.Mesh(spGeo2, spMat));
+                scene.add( sphere2 );
                 
                 // reference for teleportation
 				prevPoint = {
@@ -270,33 +278,57 @@
                 renderer.xr.setReferenceSpace();
                 const baseReferenceSpace = renderer.xr.getReferenceSpace();
 
+                // const offsetPosition = {
+                //     x:  - intersection.point.x,
+                //     y:  - (intersection.point.y - 1.6),
+                //     z:  - intersection.point.z,
+                //     w: 1
+                // };
                 const offsetPosition = {
-                    x:  - intersection.point.x,
-                    y:  - (intersection.point.y - 1.6),
-                    z:  - intersection.point.z,
+                    x:  - 0 + prevPoint.x,
+                    y:  - (radius - 1.6) + prevPoint.y,
+                    z:  radius + prevPoint.z,
                     w: 1
                 };
 
                 prevPoint = {
-                    x: intersection.point.x,
-                    y: intersection.point.y - 1.6,
-                    z: intersection.point.z
+                    x: - offsetPosition.x,
+                    y: - offsetPosition.y,
+                    z: - offsetPosition.z
+                };
+
+                const heightOffset = {
+                    x: 0,
+                    y: -1.6,
+                    z: 0
                 };
                 
                 // fixing
                 // const offsetRotation = new THREE.Quaternion();
 
                 // testing
+                targetNormal = new THREE.Vector3(0, 0, 1);
+                startNormal = new THREE.Vector3(0, 1, 0);
                 const rotationAxis = new THREE.Vector3().crossVectors(startNormal, targetNormal);
                 const rotationRadian = startNormal.angleTo(targetNormal);
 
-                const offsetRotation = new THREE.Quaternion().setFromAxisAngle(rotationAxis, -rotationRadian);
+                // const offsetRotation = new THREE.Quaternion().setFromAxisAngle(rotationAxis, -rotationRadian);
+                let offsetRotation = new THREE.Quaternion().setFromUnitVectors(targetNormal, startNormal);
+                console.log(offsetRotation);
+                prevRotation.multiply(offsetRotation);
 
-                const transform = new XRRigidTransform( offsetPosition, offsetRotation );
-                const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform );
+                // prevRotation = offsetRotation;
+
+                // const transform = new XRRigidTransform( offsetPosition, offsetRotation );
+                const transform = new XRRigidTransform( offsetPosition, new THREE.Quaternion() );
+                const transform2 = new XRRigidTransform( new THREE.Vector3(), offsetRotation);
+                const transform3 = new XRRigidTransform( heightOffset, new THREE.Quaternion());
+                // const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform ).getOffsetReferenceSpace( transform3);
+                const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform3 ).getOffsetReferenceSpace( transform2 ).getOffsetReferenceSpace(transform);
 
                 tpCount++;
                 renderer.xr.setReferenceSpace( teleportSpaceOffset );
+                console.log(teleportSpaceOffset);
             }
 
             function animate() {
@@ -320,9 +352,6 @@
                             console.log(controller1.userData.isTeleporting);
                             console.log(controller2.userData.isTeleporting);
                             displayed = true;
-
-                            // quaternion test here
-
                         }
                     }
                 } else {
@@ -346,6 +375,7 @@
                         if ( intersects.length > 0 ) {
 
                             intersection = intersects[ 0 ];
+                            intersection.point.set(new THREE.Vector3(0, radius, -radius));
 
                         }
 
@@ -361,6 +391,7 @@
                         if ( intersects.length > 0 ) {
 
                             intersection = intersects[ 0 ];
+                            intersection.point.set(new THREE.Vector3(0, radius, -radius));
 
                         }
 
@@ -371,6 +402,7 @@
                         const positions = line.geometry.attributes.position;
                         const p = intersection.point;
                         const n = intersection.face.normal.clone();
+                        console.log(n);
                         targetNormal = n;
                         n.transformDirection( sphere.matrixWorld );
 						n.multiplyScalar( -radius );
@@ -378,7 +410,6 @@
 						line.geometry.attributes.position.setXYZ( 0, p.x, p.y, p.z );
 						line.geometry.attributes.position.setXYZ( 1, n.x, n.y, n.z );
 						line.geometry.attributes.position.needsUpdate = true;
-                        console.log(n);
                     }
                 }
                 renderer.render( scene, camera );
