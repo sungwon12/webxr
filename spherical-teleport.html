@@ -44,10 +44,10 @@
             let room;
             let line;
 
-            let intersection, prevPoint;
-            let prevRotation = new THREE.Quaternion();
+            let intersection;
             let tpStart;
 			let displayed = false;
+            let baseNormal = new THREE.Vector3(0, 1, 0);
             let startNormal = new THREE.Vector3(0, 1, 0);
             let targetNormal;
 
@@ -57,7 +57,7 @@
             const aspect = 2;
             const near = 0.1;
             const far = 20;
-            const movementTime = 3000 // in ms
+            const movementTime = 1000 // in ms
 
             const gltfLoader = new GLTFLoader();
             const url = 'media/gltf/sphere/dodecahedron.gltf';
@@ -89,26 +89,17 @@
 
                 sphere = new THREE.Mesh(spGeo, spMat);
                 sphere.position.y = radius;
-                let sphere2 = new THREE.Mesh(spGeo3, spMat2);
-                sphere2.position.y = radius * 2;
 
-                // sphere = new THREE.Mesh(
-                //     new THREE.SphereGeometry(7, 50, 32),
-                //     new THREE.MeshBasicMaterial({color: 0xFFFFFF})
-                //     );
+                let markerBottom = new THREE.Mesh(spGeo2, spMat);
+                let markerTop = new THREE.Mesh(spGeo2, spMat2);
+                markerTop.position.y = radius * 2;
+
                 sphere.visible = true;
                 console.log(sphere);
                 scene.add( sphere );
-                scene.add(new THREE.Mesh(spGeo2, spMat));
-                scene.add( sphere2 );
+                scene.add( markerBottom );
+                scene.add( markerTop );
                 
-                // reference for teleportation
-				prevPoint = {
-					x: 0,
-					y: 0,
-					z: 0
-				};
-
                 let light = new THREE.PointLight( 0x404040 );
                 light.position.set( 0, 1.8 * radius, 0 );
 
@@ -259,72 +250,41 @@
             function teleportAnimate(elapsedTime) {
                 renderer.xr.setReferenceSpace();
                 const baseReferenceSpace = renderer.xr.getReferenceSpace();
-                const offsetPosition = {
-                    x: - prevPoint.x - (intersection.point.x - prevPoint.x) * elapsedTime / movementTime,
-                    y: - prevPoint.y - (intersection.point.y - 1.6 - prevPoint.y) * elapsedTime / movementTime,
-                    z: - prevPoint.z - (intersection.point.z - prevPoint.z) * elapsedTime / movementTime,
-                    w: 1
-                };
+                console.log(targetNormal);
+                console.log(startNormal);
 
-                const offsetRotation = new THREE.Quaternion();
-                const transform = new XRRigidTransform( offsetPosition, offsetRotation );
-                const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform );
+                const vectorToSphereCenter = new THREE.Vector3(0, -radius, 0);
+
+                let movementRotation = new THREE.Quaternion().setFromUnitVectors(targetNormal.normalize(), startNormal.normalize());
+                let slerp = new THREE.Quaternion().slerp(movementRotation, elapsedTime / movementTime);
+                let offsetRotation = new THREE.Quaternion().setFromUnitVectors(startNormal.normalize(), baseNormal.normalize()).multiply(slerp);
+                // slerp.multiply(new THREE.Quaternion().setFromUnitVectors(startNormal.normalize(), baseNormal.normalize()));
+
+                const goToCenter = new XRRigidTransform( vectorToSphereCenter, new THREE.Quaternion() );
+                const rotateWorld = new XRRigidTransform( new THREE.Vector3(), offsetRotation);
+                // const rotateWorld = new XRRigidTransform( new THREE.Vector3(), slerp );
+                const backToSurface = new XRRigidTransform( vectorToSphereCenter.negate(), new THREE.Quaternion());
+                const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( backToSurface ).getOffsetReferenceSpace( rotateWorld ).getOffsetReferenceSpace(goToCenter);
 
                 tpCount++;
                 renderer.xr.setReferenceSpace( teleportSpaceOffset );
+                console.log(teleportSpaceOffset);
             }
 
             function finalMove() {
                 renderer.xr.setReferenceSpace();
                 const baseReferenceSpace = renderer.xr.getReferenceSpace();
+                console.log(targetNormal);
+                console.log(startNormal);
 
-                // const offsetPosition = {
-                //     x:  - intersection.point.x,
-                //     y:  - (intersection.point.y - 1.6),
-                //     z:  - intersection.point.z,
-                //     w: 1
-                // };
-                const offsetPosition = {
-                    x:  - 0 + prevPoint.x,
-                    y:  - (radius - 1.6) + prevPoint.y,
-                    z:  radius + prevPoint.z,
-                    w: 1
-                };
-
-                prevPoint = {
-                    x: - offsetPosition.x,
-                    y: - offsetPosition.y,
-                    z: - offsetPosition.z
-                };
-
-                const heightOffset = {
-                    x: 0,
-                    y: -1.6,
-                    z: 0
-                };
+                const vectorToSphereCenter = new THREE.Vector3(0, -radius, 0);
                 
-                // fixing
-                // const offsetRotation = new THREE.Quaternion();
-
-                // testing
-                targetNormal = new THREE.Vector3(0, 0, 1);
-                startNormal = new THREE.Vector3(0, 1, 0);
-                const rotationAxis = new THREE.Vector3().crossVectors(startNormal, targetNormal);
-                const rotationRadian = startNormal.angleTo(targetNormal);
-
-                // const offsetRotation = new THREE.Quaternion().setFromAxisAngle(rotationAxis, -rotationRadian);
-                let offsetRotation = new THREE.Quaternion().setFromUnitVectors(targetNormal, startNormal);
-                console.log(offsetRotation);
-                prevRotation.multiply(offsetRotation);
-
-                // prevRotation = offsetRotation;
-
-                // const transform = new XRRigidTransform( offsetPosition, offsetRotation );
-                const transform = new XRRigidTransform( offsetPosition, new THREE.Quaternion() );
-                const transform2 = new XRRigidTransform( new THREE.Vector3(), offsetRotation);
-                const transform3 = new XRRigidTransform( heightOffset, new THREE.Quaternion());
-                // const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform ).getOffsetReferenceSpace( transform3);
-                const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( transform3 ).getOffsetReferenceSpace( transform2 ).getOffsetReferenceSpace(transform);
+                let offsetRotation = new THREE.Quaternion().setFromUnitVectors(targetNormal.normalize(), baseNormal.normalize());
+                
+                const goToCenter = new XRRigidTransform( vectorToSphereCenter, new THREE.Quaternion() );
+                const rotateWorld = new XRRigidTransform( new THREE.Vector3(), offsetRotation);
+                const backToSurface = new XRRigidTransform( vectorToSphereCenter.negate(), new THREE.Quaternion());
+                const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace( backToSurface ).getOffsetReferenceSpace( rotateWorld ).getOffsetReferenceSpace(goToCenter);
 
                 tpCount++;
                 renderer.xr.setReferenceSpace( teleportSpaceOffset );
@@ -339,10 +299,12 @@
 
             function render() {
                 if (controller1.userData.isTeleporting || controller2.userData.isTeleporting) {
-                    if (Date.now() - tpStart < movementTime) { // flip inequality when done
+                    if (Date.now() - tpStart > movementTime) {
                         controller1.userData.isTeleporting = false;
                         controller2.userData.isTeleporting = false;
                         finalMove();
+                        startNormal = targetNormal;
+                        targetNormal = undefined;
                         tpStart = undefined;
                         console.log(tpCount);
                         displayed = false;
@@ -398,12 +360,10 @@
                     }
 
                     if (intersection) {
-                        console.log(intersection);
                         const positions = line.geometry.attributes.position;
                         const p = intersection.point;
                         const n = intersection.face.normal.clone();
-                        console.log(n);
-                        targetNormal = n;
+                        targetNormal = n.clone().negate();
                         n.transformDirection( sphere.matrixWorld );
 						n.multiplyScalar( -radius );
 						n.add( intersection.point );
