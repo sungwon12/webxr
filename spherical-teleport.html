@@ -51,6 +51,10 @@
             let startNormal = new THREE.Vector3(0, 1, 0);
             let targetNormal;
 
+            let markerGeo = new THREE.SphereGeometry(1.5, 32, 16);
+            let markerMaterial = new THREE.MeshPhongMaterial({color: 0x000000, side: DoubleSide});
+            let markerMesh = new THREE.Mesh(markerGeo, markerMaterial);
+
             const tempMatrix = new THREE.Matrix4();
 
             const fov = 100;
@@ -83,22 +87,42 @@
 
                 let spGeo = new THREE.SphereGeometry(radius * 0.99, 32, 16);
                 let spGeo2 = new THREE.SphereGeometry(1, 32, 16);
-                let spGeo3 = new THREE.SphereGeometry(1, 32, 16);
                 let spMat = new THREE.MeshPhongMaterial({color: 0x303030, side: DoubleSide});
                 let spMat2 = new THREE.MeshPhongMaterial({color: 0xFFFFFF, side: DoubleSide});
-
+                let spMat3 = new THREE.MeshPhongMaterial({color: 0x00FFFF, side: DoubleSide});
+                let spMat4 = new THREE.MeshPhongMaterial({color: 0xFF00FF, side: DoubleSide});
+                let spMat5 = new THREE.MeshPhongMaterial({color: 0xFFFF00, side: DoubleSide});
+                let spMat6 = new THREE.MeshPhongMaterial({color: 0xFF0000, side: DoubleSide});
+                
                 sphere = new THREE.Mesh(spGeo, spMat);
                 sphere.position.y = radius;
 
                 let markerBottom = new THREE.Mesh(spGeo2, spMat);
-                let markerTop = new THREE.Mesh(spGeo2, spMat2);
+                let markerLeft = new THREE.Mesh(spGeo2, spMat2);
+                markerLeft.position.y = radius;
+                markerLeft.position.x = -radius;
+                let markerRight = new THREE.Mesh(spGeo2, spMat3);
+                markerRight.position.y = radius;
+                markerRight.position.x = radius;
+                let markerFront = new THREE.Mesh(spGeo2, spMat4);
+                markerFront.position.y = radius;
+                markerFront.position.z = -radius;
+                let markerRear = new THREE.Mesh(spGeo2, spMat5);
+                markerRear.position.y = radius;
+                markerRear.position.z = radius;
+                let markerTop = new THREE.Mesh(spGeo2, spMat6);
                 markerTop.position.y = radius * 2;
-
+                
                 sphere.visible = true;
                 console.log(sphere);
                 scene.add( sphere );
                 scene.add( markerBottom );
                 scene.add( markerTop );
+                scene.add( markerLeft );
+                scene.add( markerRight );
+                scene.add( markerFront );
+                scene.add( markerRear );
+                scene.add( markerMesh );
                 
                 let light = new THREE.PointLight( 0x404040 );
                 light.position.set( 0, 1.8 * radius, 0 );
@@ -250,13 +274,14 @@
             function teleportAnimate(elapsedTime) {
                 renderer.xr.setReferenceSpace();
                 const baseReferenceSpace = renderer.xr.getReferenceSpace();
-                console.log(targetNormal);
-                console.log(startNormal);
+                // console.log(targetNormal);
+                // console.log(startNormal);
 
                 const vectorToSphereCenter = new THREE.Vector3(0, -radius, 0);
 
                 let movementRotation = new THREE.Quaternion().setFromUnitVectors(targetNormal.normalize(), startNormal.normalize());
                 let slerp = new THREE.Quaternion().slerp(movementRotation, elapsedTime / movementTime);
+                // console.log(new THREE.Quaternion().setFromUnitVectors(startNormal.normalize(), baseNormal.normalize()));
                 let offsetRotation = new THREE.Quaternion().setFromUnitVectors(startNormal.normalize(), baseNormal.normalize()).multiply(slerp);
                 // slerp.multiply(new THREE.Quaternion().setFromUnitVectors(startNormal.normalize(), baseNormal.normalize()));
 
@@ -268,7 +293,7 @@
 
                 tpCount++;
                 renderer.xr.setReferenceSpace( teleportSpaceOffset );
-                console.log(teleportSpaceOffset);
+                // console.log(teleportSpaceOffset);
             }
 
             function finalMove() {
@@ -288,7 +313,7 @@
 
                 tpCount++;
                 renderer.xr.setReferenceSpace( teleportSpaceOffset );
-                console.log(teleportSpaceOffset);
+                // console.log(teleportSpaceOffset);
             }
 
             function animate() {
@@ -302,7 +327,7 @@
                     if (Date.now() - tpStart > movementTime) {
                         controller1.userData.isTeleporting = false;
                         controller2.userData.isTeleporting = false;
-                        finalMove();
+                        //finalMove();
                         startNormal = targetNormal;
                         targetNormal = undefined;
                         tpStart = undefined;
@@ -337,7 +362,6 @@
                         if ( intersects.length > 0 ) {
 
                             intersection = intersects[ 0 ];
-                            intersection.point.set(new THREE.Vector3(0, radius, -radius));
 
                         }
 
@@ -351,15 +375,20 @@
                         const intersects = raycaster.intersectObjects( [ sphere ] );
 
                         if ( intersects.length > 0 ) {
-
+                            
                             intersection = intersects[ 0 ];
-                            intersection.point.set(new THREE.Vector3(0, radius, -radius));
 
                         }
 
                     }
 
                     if (intersection) {
+                        // markerMesh.visible = true;
+                        console.log(intersection.point.x);
+                        markerMesh.position.copy(intersection.point);
+                        console.log(intersection);
+                        console.log(markerMesh.position);
+                        markerMesh.geometry.attributes.position.needsUpdate = true;
                         const positions = line.geometry.attributes.position;
                         const p = intersection.point;
                         const n = intersection.face.normal.clone();
